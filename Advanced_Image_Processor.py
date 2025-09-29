@@ -1,27 +1,39 @@
 
-import tkinter as tk
+import tkinter as tk # مكتبة الواجهة الرسومية الأساسية في بايثون، نستخدمها لإنشاء النوافذ والأزرار.
 from tkinter import ttk, filedialog, messagebox, simpledialog, font
+# ttk: يوفر عناصر واجهة (أزرار، إطارات) ذات مظهر أحدث وأكثر احترافية.
+# filedialog: لفتح نافذة اختيار الملفات (عندما تضغط "تحميل صورة").
+# messagebox: لإظهار الرسائل المنبثقة (مثل رسائل الخطأ أو التأكيد).
+# simpledialog: لفتح نوافذ بسيطة تطلب من المستخدم إدخال قيمة (مثل زاوية الدوران).
+# font: للتحكم في أنواع وأحجام الخطوط في الواجهة.
 import cv2
 import numpy as np
 from PIL import Image, ImageTk
+# Image: للتعامل مع كائنات الصور.
+# ImageTk: لتحويل الصور من صيغة Pillow إلى صيغة يمكن لـ Tkinter عرضها.
 import os
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import time
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg # جزء من Matplotlib يسمح بدمج الرسوم البيانية داخل نافذة Tkinter.
+import time # مكتبة الوقت، نستخدمها للحصول على الوقت والتاريخ الحاليين لإعطاء أسماء فريدة للصور والفيديوهات المسجلة.
+
 
 # ==========================================================
 # ToolTip Class (No Changes)
 # ==========================================================
 class ToolTip(object):
+    #تهيئة كائن tooltip
     def __init__(self, widget, text):
         self.widget = widget; self.text = text; self.tooltip_window = None
         self.widget.bind("<Enter>", self.show_tooltip); self.widget.bind("<Leave>", self.hide_tooltip)
+
+        #show tooltip 
     def show_tooltip(self, event):
         if self.tooltip_window or not self.text: return
         x, y, _, _ = self.widget.bbox("insert"); x = x + self.widget.winfo_rootx() + 25; y = y + self.widget.winfo_rooty() + 25
         self.tooltip_window = tw = tk.Toplevel(self.widget); tw.wm_overrideredirect(True); tw.wm_geometry(f"+{x}+{y}")
         label = tk.Label(tw, text=self.text, justify=tk.LEFT, background="#2E2E2E", foreground="#FFFFFF", relief=tk.SOLID, borderwidth=1, font=("Segoe UI", "10", "normal"), padx=8, pady=4)
         label.pack(ipadx=1)
+        #hide tooltip
     def hide_tooltip(self, event):
         if self.tooltip_window: self.tooltip_window.destroy()
         self.tooltip_window = None
@@ -32,6 +44,7 @@ class ToolTip(object):
 class WatershedHelper:
     def __init__(self, image):
         self.image = image; self.markers = np.zeros(image.shape[:2], dtype=np.int32); self.current_marker = 1; self.drawing = False
+        # دالة الاستجابة لأحداث الماوس للرسم على الصورة
     def mouse_callback(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN: self.drawing = True
         elif event == cv2.EVENT_LBUTTONUP: self.drawing = False
@@ -46,6 +59,7 @@ class WatershedHelper:
 # ==========================================================
 # Main App Class
 # ==========================================================
+# نفطه انطلاق التطبيق 
 class AdvancedImageProcessor:
     def __init__(self, root):
         self.root = root
@@ -57,12 +71,12 @@ class AdvancedImageProcessor:
 
         self.original_image = None; self.processed_image = None; self.video_capture = None
         self.is_camera_on = False; self.is_recording = False; self.video_writer = None
-        self.effect_grayscale = tk.BooleanVar(); self.effect_canny = tk.BooleanVar()
+        self.effect_grayscale = tk.BooleanVar(); self.effect_canny = tk.BooleanVar() #BooleanVar عشان عند الضغط على اي زر تتغير حالتة الى ترو
         self.effect_face_detect = tk.BooleanVar(); self.effect_flip = tk.BooleanVar()
-        self.last_processed_frame = None
+        self.last_processed_frame = None # يخزن صوره ملتقطة من الفديو
 
-        self.load_cascades()
-        self.setup_gui()
+        self.load_cascades() # تحميل ملفات التعرف على الوجوه والعيون
+        self.setup_gui() # اعداد الازرار والواجهات الرسومية 
 
     def setup_styles(self):
         # ... (No changes here, but adding style for horizontal scrollbar)
@@ -85,34 +99,39 @@ class AdvancedImageProcessor:
     def setup_gui(self):
         main_frame = ttk.Frame(self.root, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
-
+        
+        #  # إنشاء حاوية للوحة التحكم الجانبية وتحديد عرض ثابت لها
         controls_container = ttk.Frame(main_frame, width=420)
         controls_container.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
         controls_container.pack_propagate(False)
 
+        # --- Canvas --- (To hold scrollable content)
         canvas = tk.Canvas(controls_container, bg=self.BG_COLOR, highlightthickness=0)
 
         # --- Scrollbars (Vertical and Horizontal) ---
         v_scrollbar = ttk.Scrollbar(controls_container, orient="vertical", command=canvas.yview, style='Vertical.TScrollbar')
         h_scrollbar = ttk.Scrollbar(controls_container, orient="horizontal", command=canvas.xview, style='Horizontal.TScrollbar')
         
-        # Configure canvas to use both scrollbars
-        canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        # نقول لكنفا استخدم السكرول
+        canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set) # مجرد التحريك يضهر لي الازرار المخفية خلف الواجهات 
 
         # Packing order is important for layout
         v_scrollbar.pack(side="right", fill="y")
         h_scrollbar.pack(side="bottom", fill="x")
         canvas.pack(side="left", fill="both", expand=True)
 
-        scrollable_frame = ttk.Frame(canvas)
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        scrollable_frame = ttk.Frame(canvas)# الان جميع الازرار والسكرول في هذا المتغير 
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw") # نقول لكنفا انشئ نافذة في الزاوية اليسرى العليا
 
+
+        # دالة داخلية ليتم استدعاؤها كلما تغير حجم المحتوى الداخلي
         def on_frame_configure(event):
-            canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.configure(scrollregion=canvas.bbox("all")) # تحديث منطقة التمرير لتشمل كل المحتوى
 
+            # ربط حدث "تغير الحجم" بهذه الدالة لتفعيل التمرير تلقائيًا
         scrollable_frame.bind("<Configure>", on_frame_configure)
 
-        # --- All widgets are packed into the scrollable_frame (same as before) ---
+        # --- All widgets are packed into the scrollable_frame (same as before) 
         title_label = ttk.Label(scrollable_frame, text="معالج الصور المتقدم", font=self.title_font, foreground=self.ACCENT_COLOR, anchor='center')
         title_label.pack(pady=15, fill=tk.X, padx=10)
 
@@ -142,7 +161,7 @@ class AdvancedImageProcessor:
         team_label.pack(pady=10)
 
         # --- Right Image Display Panel (No Changes Here) ---
-        self.images_frame = ttk.Frame(main_frame)
+        self.images_frame = ttk.Frame(main_frame) # واجهات عرض الصور والفديو
         self.images_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         self.original_label = ttk.Label(self.images_frame, text="الصورة الأصلية", background='#252525', anchor='center')
         self.original_label.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
@@ -174,6 +193,7 @@ class AdvancedImageProcessor:
         ttk.Checkbutton(effects_frame, text="كشف الوجوه والعيون", variable=self.effect_face_detect, style='TCheckbutton').pack(anchor='w', padx=5)
         ttk.Checkbutton(effects_frame, text="قلب أفقي (Flip)", variable=self.effect_flip, style='TCheckbutton').pack(anchor='w', padx=5)
     
+        # إنشاء علامة التبويب الخاصة بالفلاتر الأساسية
     def create_basic_filters_tab(self, notebook):
         tab = ttk.Frame(notebook); notebook.add(tab, text='🎨 فلاتر')
         self.add_button(tab, "Log Transformation", self.apply_log_transform, "تطبيق التحويل اللوغاريتمي لتوضيح التفاصيل في المناطق المظلمة")
@@ -183,10 +203,14 @@ class AdvancedImageProcessor:
         self.add_button(tab, "Difference Filters", self.apply_difference_filters, "إظهار الفروقات الأفقية والعمودية في الصورة")
         self.add_button(tab, "Interactive Sharpening", self.interactive_sharpen, "زيادة حدة وتفاصيل الصورة بشكل تفاعلي")
 
+    # إنشاء علامة التبويب الخاصة بكشف الحواف
+
     def create_edge_detection_tab(self, notebook):
         tab = ttk.Frame(notebook); notebook.add(tab, text='📉 حواف')
         self.add_button(tab, "Sobel Operator", self.apply_sobel, "كشف الحواف باستخدام مؤثر سوبل في الاتجاهين X و Y")
         self.add_button(tab, "Interactive Canny", self.interactive_canny, "كشف الحواف بدقة عالية مع التحكم في العتبات بشكل تفاعلي")
+
+    # إنشاء علامة التبويب الخاصة بكشف الميزات
 
     def create_feature_detection_tab(self, notebook):
         tab = ttk.Frame(notebook); notebook.add(tab, text='✨ ميزات')
@@ -197,23 +221,52 @@ class AdvancedImageProcessor:
         self.add_button(tab, "Ball Detection (Color Mask)", self.detect_and_copy_ball, "عزل الأجسام بناءً على لونها (مثال: كرة خضراء)")
         self.add_button(tab, "Manual Object Masking", self.manually_mask_object, "عزل كائن عن الخلفية يدويًا باستخدام خوارزمية GrabCut")
 
+    # إنشاء علامة التبويب الخاصة بتجزئة الصورة
+
     def create_segmentation_tab(self, notebook):
         tab = ttk.Frame(notebook); notebook.add(tab, text='🧩 تجزئة')
         self.add_button(tab, "K-Means Segmentation", self.segment_kmeans, "تجزئة الصورة إلى مجموعات لونية باستخدام K-Means")
         self.add_button(tab, "Automatic Watershed", self.segment_watershed_auto, "تجزئة الصورة تلقائيًا لفصل الكائنات المتلامسة")
         self.add_button(tab, "Interactive Watershed", self.segment_watershed_interactive, "تجزئة الصورة بشكل تفاعلي عبر تحديد الكائن والخلفية")
 
+# إنشاء علامة التبويب الخاصة بالعمليات المورفولوجية
     def create_morphology_tab(self, notebook):
         tab = ttk.Frame(notebook); notebook.add(tab, text='💠 مورفولوجيا')
         self.add_button(tab, "Erosion, Dilation, Gradient", self.apply_morph_basic, "تطبيق عمليات التآكل والتمدد والتدرج على الصورة")
         self.add_button(tab, "Opening & TopHat", self.apply_opening_tophat, "إزالة النقاط الصغيرة (Opening) وإبراز التفاصيل الدقيقة (Top-hat)")
 
+ # إنشاء علامة التبويب الخاصة بالتحويلات الهندسية
     def create_geometric_tab(self, notebook):
         tab = ttk.Frame(notebook); notebook.add(tab, text='📐 هندسية')
         self.add_button(tab, "Rotation (تدوير)", self.apply_rotation, "تدوير الصورة بزاوية محددة")
         self.add_button(tab, "Translation (إزاحة)", self.apply_translation, "تحريك الصورة أفقيًا أو عموديًا")
-        self.add_button(tab, "Zooming/Shrinking", self.apply_zoom, "تكبير أو تصغير الصورة بمعامل محدد")
+        self.add_button(tab, "Interactive Zoom", self.interactive_zoom, "تكبير أو تصغير الصورة بشكل تفاعلي")
         self.add_button(tab, "Cropping (اقتصاص)", self.apply_crop, "قص جزء محدد من الصورة بشكل تفاعلي")
+
+
+# فتح نافذة تفاعلية للتحكم في تكبير الصورة
+    def interactive_zoom(self):
+        top, image_label, controls_frame = self._create_interactive_window("Interactive Zoom")
+        if top is None: return
+        def update_zoom(val):
+            factor = float(val) / 100.0
+            if factor == 0: return
+            zoomed_img = cv2.resize(self.original_image, None, fx=factor, fy=factor, interpolation=cv2.INTER_LINEAR)
+            h, w, _ = zoomed_img.shape
+            if w > 1500 or h > 800:
+                scale = min(1500.0/w, 800.0/h)
+                zoomed_img = cv2.resize(zoomed_img, (int(w*scale), int(h*scale)))
+            img_pil = Image.fromarray(zoomed_img)
+            img_tk = ImageTk.PhotoImage(image=img_pil)
+            image_label.config(image=img_tk)
+            image_label.image = img_tk
+        slider_frame = ttk.Frame(controls_frame)
+        ttk.Label(slider_frame, text="معامل التكبير (%)").pack(side=tk.LEFT)
+        slider = ttk.Scale(slider_frame, from_=10, to=300, orient=tk.HORIZONTAL, command=update_zoom)
+        slider.set(100)
+        slider.pack(side=tk.LEFT, expand=True, fill=tk.X)
+        slider_frame.pack(fill=tk.X, padx=5, pady=5)
+        update_zoom(100)
 
     def start_camera(self):
         if self.is_camera_on: return
@@ -221,6 +274,9 @@ class AdvancedImageProcessor:
         if not self.video_capture.isOpened(): messagebox.showerror("خطأ", "لا يمكن فتح الكاميرا."); return
         self.is_camera_on = True; self.original_image = None; self.processed_image = None
         self.original_label.pack_forget(); self.display_images(); self.update_camera_feed()
+
+
+        
     def stop_camera(self):
         if not self.is_camera_on: return
         self.is_camera_on = False
@@ -228,6 +284,9 @@ class AdvancedImageProcessor:
         if self.video_capture: self.video_capture.release()
         self.processed_label.config(image='', text="الكاميرا متوقفة")
         self.original_label.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+
+
+# تحديث وعرض إطار الكاميرا باستمرار
     def update_camera_feed(self):
         if not self.is_camera_on: return
         ret, frame = self.video_capture.read()
@@ -249,6 +308,8 @@ class AdvancedImageProcessor:
                 else: frame_to_write = cv2.cvtColor(frame_to_write, cv2.COLOR_RGB2BGR)
                 self.video_writer.write(frame_to_write)
         self.root.after(15, self.update_camera_feed)
+
+# كشف الوجوه والعيون في إطار الفيديو
     def detect_faces_on_frame(self, frame_to_process):
         if self.face_cascade is None or self.eye_cascade is None: return
         gray = cv2.cvtColor(frame_to_process, cv2.COLOR_RGB2GRAY); faces = self.face_cascade.detectMultiScale(gray, 1.2, 5)
@@ -256,6 +317,8 @@ class AdvancedImageProcessor:
             cv2.rectangle(frame_to_process, (x,y), (x+w,y+h), (255,0,0), 2); roi_gray = gray[y:y+h, x:x+w]; roi_color = frame_to_process[y:y+h, x:x+w]
             eyes = self.eye_cascade.detectMultiScale(roi_gray)
             for (ex,ey,ew,eh) in eyes: cv2.rectangle(roi_color, (ex,ey), (ex+ew,ey+eh), (0,255,0), 2)
+
+ # بدء أو إيقاف تسجيل الفيديو
     def toggle_recording(self):
         if not self.is_camera_on: messagebox.showwarning("تنبيه", "يجب تشغيل الكاميرا أولاً."); return
         if self.is_recording:
@@ -267,16 +330,24 @@ class AdvancedImageProcessor:
                 self.is_recording = True; self.record_button.config(text="⏹️ إيقاف", style='TButton'); h, w = self.last_processed_frame.shape[:2]
                 filename = f"recording_{time.strftime('%Y%m%d_%H%M%S')}.avi"; fourcc = cv2.VideoWriter_fourcc(*'XVID'); self.video_writer = cv2.VideoWriter(filename, fourcc, 20.0, (w, h))
             else: messagebox.showerror("خطأ", "لا يوجد إطار فيديو لبدء التسجيل.")
+
+
     def take_snapshot(self):
         if not self.is_camera_on or self.last_processed_frame is None: messagebox.showwarning("تنبيه", "يجب تشغيل الكاميرا أولاً."); return
         filename = f"snapshot_{time.strftime('%Y%m%d_%H%M%S')}.png"; snapshot = self.last_processed_frame
         if len(snapshot.shape) == 3: snapshot = cv2.cvtColor(snapshot, cv2.COLOR_RGB2BGR)
         cv2.imwrite(filename, snapshot); messagebox.showinfo("نجاح", f"تم حفظ اللقطة باسم:\n{filename}")
+
+
+# إنشاء نافذة جديدة لعرض العمليات التفاعلية
     def _create_interactive_window(self, title):
         if self.original_image is None: messagebox.showerror("خطأ", "يرجى تحميل صورة أولاً"); return None, None, None
         top = tk.Toplevel(self.root); top.title(title); top.configure(bg=self.BG_COLOR)
         image_label = ttk.Label(top, background=self.BG_COLOR); image_label.pack(pady=10, padx=10)
         controls_frame = ttk.Frame(top); controls_frame.pack(pady=5, padx=10, fill=tk.X); return top, image_label, controls_frame
+    
+
+# فتح نافذة تفاعلية للتحكم في فلتر Gaussian Blur
     def interactive_blur(self):
         top, image_label, controls_frame = self._create_interactive_window("Interactive Gaussian Blur")
         if top is None: return
@@ -287,6 +358,9 @@ class AdvancedImageProcessor:
         ttk.Label(controls_frame, text="Kernel Size").pack(side=tk.LEFT)
         slider = ttk.Scale(controls_frame, from_=1, to=51, orient=tk.HORIZONTAL, command=update_blur, style='Horizontal.TScale'); slider.set(5); slider.pack(side=tk.LEFT, expand=True, fill=tk.X)
         update_blur(5)
+
+
+
     def interactive_canny(self):
         top, image_label, controls_frame = self._create_interactive_window("Interactive Canny Edge Detection")
         if top is None: return
@@ -298,6 +372,9 @@ class AdvancedImageProcessor:
         t1_frame = ttk.Frame(controls_frame); ttk.Label(t1_frame, text="Threshold 1").pack(side=tk.LEFT); t1_slider = tk.Scale(t1_frame, from_=0, to=255, orient=tk.HORIZONTAL, command=update_canny); t1_slider.set(100); t1_slider.pack(side=tk.LEFT, expand=True, fill=tk.X); t1_frame.pack(fill=tk.X)
         t2_frame = ttk.Frame(controls_frame); ttk.Label(t2_frame, text="Threshold 2").pack(side=tk.LEFT); t2_slider = tk.Scale(t2_frame, from_=0, to=255, orient=tk.HORIZONTAL, command=update_canny); t2_slider.set(200); t2_slider.pack(side=tk.LEFT, expand=True, fill=tk.X); t2_frame.pack(fill=tk.X)
         update_canny()
+
+
+    # فتح نافذة تفاعلية لزيادة حدة الصورة
     def interactive_sharpen(self):
         top, image_label, controls_frame = self._create_interactive_window("Interactive Sharpening")
         if top is None: return
@@ -308,32 +385,46 @@ class AdvancedImageProcessor:
         ttk.Label(controls_frame, text="Amount").pack(side=tk.LEFT)
         slider = ttk.Scale(controls_frame, from_=0, to=50, orient=tk.HORIZONTAL, command=update_sharpen, style='Horizontal.TScale'); slider.set(10); slider.pack(side=tk.LEFT, expand=True, fill=tk.X)
         update_sharpen(10)
+
+
+  # تطبيق التحويل اللوغاريتمي على الصورة
     def apply_log_transform(self):
         img_gray = self.get_current_image(gray=True);
         if img_gray is None: return
         img_float = np.float32(img_gray) + 1; log_image = np.log(img_float)
         normalized_image = cv2.normalize(log_image, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
         self.processed_image = normalized_image; self.display_images()
+
+
+ # تطبيق فلتر Median لإزالة الضوضاء من الصورة
     def apply_median_filter(self):
         img = self.get_current_image();
         if img is None: return
         self.processed_image = cv2.medianBlur(img, 5); self.display_images()
+
+
     def apply_custom_filter(self):
         img = self.get_current_image();
         if img is None: return
         kernel = np.ones((5, 5), np.float32) / 25; self.processed_image = cv2.filter2D(img, -1, kernel); self.display_images()
+
+
     def apply_difference_filters(self):
         img = self.get_current_image(gray=True);
         if img is None: return
         kernel_h = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]]); kernel_v = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
         horizontal = cv2.filter2D(img, -1, kernel_h); vertical = cv2.filter2D(img, -1, kernel_v)
         self.show_results_in_new_window([self.original_image, horizontal, vertical], ["Original", "Horizontal", "Vertical"])
+
+
     def apply_sobel(self):
         img = self.get_current_image(gray=True);
         if img is None: return
         sobelx = cv2.Sobel(img, cv2.CV_64F, 1, 0, ksize=5); sobely = cv2.Sobel(img, cv2.CV_64F, 0, 1, ksize=5)
         sobel_combined = cv2.magnitude(sobelx, sobely)
         self.show_results_in_new_window([cv2.convertScaleAbs(sobelx), cv2.convertScaleAbs(sobely), cv2.convertScaleAbs(sobel_combined)], ["Sobel X", "Sobel Y", "Magnitude"])
+
+
     def detect_faces_eyes(self):
         img = self.get_current_image();
         if img is None: return
@@ -344,6 +435,9 @@ class AdvancedImageProcessor:
             roi_gray = gray[y:y + h, x:x + w]; roi_color = img_with_detections[y:y + h, x:x + w]; eyes = self.eye_cascade.detectMultiScale(roi_gray)
             for (ex, ey, ew, eh) in eyes: cv2.rectangle(roi_color, (ex, ey), (ex + ew, ey + eh), (0, 255, 0), 2)
         self.processed_image = img_with_detections; self.display_images()
+
+
+
     def detect_circles(self):
         img = self.get_current_image();
         if img is None: return
@@ -353,6 +447,8 @@ class AdvancedImageProcessor:
             circles = np.uint16(np.around(circles))
             for i in circles[0, :]: cv2.circle(output, (i[0], i[1]), i[2], (0, 255, 0), 2); cv2.circle(output, (i[0], i[1]), 2, (0, 0, 255), 3)
         self.processed_image = output; self.display_images()
+
+
     def detect_lines(self):
         img = self.get_current_image();
         if img is None: return
@@ -362,17 +458,25 @@ class AdvancedImageProcessor:
             for line in lines: x1, y1, x2, y2 = line[0]; cv2.line(img_with_lines, (x1, y1), (x2, y2), (0, 255, 0), 2)
         else: messagebox.showinfo("Result", "لم يتم العثور على خطوط.", parent=self.root)
         self.show_results_in_new_window([self.original_image, edges, img_with_lines], ["Original", "Canny Edges", "Detected Lines"])
+
+
+
     def detect_corners(self):
         img = self.get_current_image();
         if img is None: return
         gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY); gray = np.float32(gray); dst = cv2.cornerHarris(gray, 2, 3, 0.04); dst = cv2.dilate(dst, None)
         img_with_corners = img.copy(); img_with_corners[dst > 0.01 * dst.max()] = [0, 0, 255]; self.processed_image = img_with_corners; self.display_images()
+
+
     def detect_and_copy_ball(self):
         img = self.get_current_image();
         if img is None: return
         hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV); lower_green = np.array([35, 100, 100]); upper_green = np.array([85, 255, 255])
         mask = cv2.inRange(hsv, lower_green, upper_green); result = cv2.bitwise_and(img, img, mask=mask)
         self.processed_image = result; self.display_images()
+
+
+
     def segment_kmeans(self):
         img = self.get_current_image();
         if img is None: return
@@ -381,6 +485,9 @@ class AdvancedImageProcessor:
         pixel_values = img.reshape((-1, 3)); pixel_values = np.float32(pixel_values); criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
         _, labels, (centers) = cv2.kmeans(pixel_values, k, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
         centers = np.uint8(centers); segmented_image = centers[labels.flatten()]; self.processed_image = segmented_image.reshape(img.shape); self.display_images()
+
+    # تجزئة الصورة تلقائيًا باستخدام خوارزمية Watershed
+
     def segment_watershed_auto(self):
         img = self.get_current_image();
         if img is None: return
@@ -390,6 +497,8 @@ class AdvancedImageProcessor:
         sure_fg = np.uint8(sure_fg); unknown = cv2.subtract(sure_bg, sure_fg); ret, markers = cv2.connectedComponents(sure_fg)
         markers = markers + 1; markers[unknown==255] = 0; markers = cv2.watershed(img, markers)
         img_result = img.copy(); img_result[markers == -1] = [255, 0, 0]; self.processed_image = img_result; self.display_images()
+
+
     def segment_watershed_interactive(self):
         img = self.get_current_image();
         if img is None: return
@@ -403,6 +512,9 @@ class AdvancedImageProcessor:
             elif key == 27: cv2.destroyWindow(window_name); return
         cv2.destroyWindow(window_name); original_img_for_watershed = self.get_current_image(); markers = cv2.watershed(original_img_for_watershed, helper.markers)
         img_result = original_img_for_watershed.copy(); img_result[markers == -1] = [255, 0, 0]; self.processed_image = img_result; self.display_images()
+
+
+    # عزل كائن عن الخلفية يدويًا باستخدام GrabCut
     def manually_mask_object(self):
         img = self.get_current_image();
         if img is None: return
@@ -412,67 +524,104 @@ class AdvancedImageProcessor:
         mask = np.zeros(img.shape[:2], np.uint8); bgdModel = np.zeros((1, 65), np.float64); fgdModel = np.zeros((1, 65), np.float64)
         cv2.grabCut(img, mask, roi, bgdModel, fgdModel, 5, cv2.GC_INIT_WITH_RECT)
         mask2 = np.where((mask == 2) | (mask == 0), 0, 1).astype('uint8'); self.processed_image = img * mask2[:, :, np.newaxis]; self.display_images()
+
+
+    # تطبيق العمليات المورفولوجية الأساسية: التآكل والتمدد والتدرج
+
     def apply_morph_basic(self):
         img = self.get_current_image(gray=True);
         if img is None: return
         _, img_bin = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY); kernel = np.ones((5,5), np.uint8)
         erosion = cv2.erode(img_bin, kernel, iterations=1); dilation = cv2.dilate(img_bin, kernel, iterations=1); gradient = cv2.morphologyEx(img_bin, cv2.MORPH_GRADIENT, kernel)
         self.show_results_in_new_window([img_bin, erosion, dilation, gradient], ["Binary", "Erosion", "Dilation", "Gradient"])
+
+
     def apply_opening_tophat(self):
         img = self.get_current_image(gray=True);
         if img is None: return
         _, img_bin = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY); kernel = np.ones((9,9), np.uint8)
         opening = cv2.morphologyEx(img_bin, cv2.MORPH_OPEN, kernel); tophat = cv2.morphologyEx(img_bin, cv2.MORPH_TOPHAT, kernel)
         self.show_results_in_new_window([img_bin, opening, tophat], ["Binary", "Opening", "Top-hat"])
+
+
+    # داله التدزير 
     def apply_rotation(self):
-        img = self.get_current_image();
+        img = self.get_current_image(); # الحصول على نسخة نظيفة من الصورة الأصلية
         if img is None: return
         angle = simpledialog.askfloat("Input", "أدخل زاوية الدوران:", parent=self.root, minvalue=-360, maxvalue=360)
         if angle is None: return
-        (h, w) = img.shape[:2]; center = (w // 2, h // 2); M = cv2.getRotationMatrix2D(center, angle, 1.0)
-        self.processed_image = cv2.warpAffine(img, M, (w, h)); self.display_images()
+        (h, w) = img.shape[:2]; center = (w // 2, h // 2); M = cv2.getRotationMatrix2D(center, angle, 1.0) # إنشاء مصفوفة التحويل الخاصة بالتدوير باستخدام OpenCV
+        # تطبيق مصفوفة التحويل على الصورة لتنفيذ التدوير
+        self.processed_image = cv2.warpAffine(img, M, (w, h)); 
+        self.display_images()
+
+    # دالة الإزاحة (التحريك)
     def apply_translation(self):
-        img = self.get_current_image();
+        img = self.get_current_image(); 
         if img is None: return
         tx = simpledialog.askinteger("Input", "أدخل الإزاحة الأفقية (X):", parent=self.root); ty = simpledialog.askinteger("Input", "أدخل الإزاحة العمودية (Y):", parent=self.root)
         if tx is None or ty is None: return
         (h, w) = img.shape[:2]; M = np.float32([[1, 0, tx], [0, 1, ty]]); self.processed_image = cv2.warpAffine(img, M, (w, h)); self.display_images()
+
+
+
     def apply_zoom(self):
         img = self.get_current_image();
         if img is None: return
-        factor = simpledialog.askfloat("Input", "أدخل معامل التكبير:", parent=self.root, minvalue=0.1)
+        factor = simpledialog.askfloat("Input", "أدخل معامل التكبير:", parent=self.root, minvalue=0.1)     # سؤال المستخدم عن معامل التكبير (factor)
         if factor is None: return
         self.processed_image = cv2.resize(img, None, fx=factor, fy=factor, interpolation=cv2.INTER_LINEAR); self.display_images()
+
+
+    # دالة الاقتصاص
     def apply_crop(self):
         img = self.get_current_image();
         if img is None: return
         messagebox.showinfo("Instructions", "ارسم مستطيلًا للقص ثم اضغط Enter", parent=self.root)
-        roi = cv2.selectROI("Crop Image", cv2.cvtColor(img, cv2.COLOR_RGB2BGR), False); cv2.destroyWindow("Crop Image")
+        roi = cv2.selectROI("Crop Image", cv2.cvtColor(img, cv2.COLOR_RGB2BGR), False);
+        cv2.destroyWindow("Crop Image")  # استخدام دالة selectROI من OpenCV للسماح للمستخدم بتحديد مستطيل على الصورة
         if not any(roi): return
-        x, y, w, h = roi; self.processed_image = img[y:y+h, x:x+w]; self.display_images()
+        x, y, w, h = roi; 
+        self.processed_image = img[y:y+h, x:x+w]; 
+        self.display_images()
+
+
     def load_cascades(self):
         self.face_cascade, self.eye_cascade = None, None
         face_path = os.path.join('haarcascades', 'haarcascade_frontalface_default.xml'); eye_path = os.path.join('haarcascades', 'haarcascade_eye.xml')
         if os.path.exists(face_path): self.face_cascade = cv2.CascadeClassifier(face_path)
         if os.path.exists(eye_path): self.eye_cascade = cv2.CascadeClassifier(eye_path)
+  
+     # ايمن ===========================================================================
+     # 
+     #  
     def load_image(self):
         self.stop_camera()
         path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp")])
         if not path: return
         self.original_image = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB); self.reset_image()
+
+
     def reset_image(self):
         if self.original_image is not None: self.processed_image = self.original_image.copy(); self.display_images()
+
+
     def display_images(self):
         self.display_image(self.original_image, self.original_label); self.display_image(self.processed_image, self.processed_label)
-    def display_image(self, img, label_widget, max_size=600):
+
+
+    def display_image(self, img, label_widget, max_size=500):
         if img is None: label_widget.config(image='', text=""); return
         if len(img.shape) == 2: img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
         h, w, _ = img.shape
         if w == 0 or h == 0: return
-        scale = min(max_size/w, max_size/h) if w > 0 and h > 0 else 1
+        scale = min(max_size/w, max_size/h) if w > 0 and h > 0 else 1    # حساب معامل التصغير/التكبير للحفاظ على نسبة أبعاد الصورة مع ضمان عدم تجاوزها الحجم الأقصى
         img_resized = cv2.resize(img, (int(w*scale), int(h*scale)))
-        img_pil = Image.fromarray(img_resized); img_tk = ImageTk.PhotoImage(image=img_pil)
-        label_widget.config(image=img_tk); label_widget.image = img_tk
+        img_pil = Image.fromarray(img_resized); # تحويل مصفوفة NumPy إلى كائن صورة باستخدام مكتبة Pillow (PIL)
+        img_tk = ImageTk.PhotoImage(image=img_pil)  # تحويل كائن صورة Pillow إلى كائن صورة متوافق مع Tkinter
+        label_widget.config(image=img_tk); label_widget.image = img_tk      # سطر مهم: الاحتفاظ بمرجع للصورة لمنع "جامع القمامة" في بايثون من حذفها
+
+
     def show_results_in_new_window(self, images, titles):
         top = tk.Toplevel(self.root); top.title("نتائج المعالجة"); top.configure(bg=self.BG_COLOR)
         fig = plt.figure(figsize=(12, 8), facecolor=self.BG_COLOR)
@@ -483,16 +632,22 @@ class AdvancedImageProcessor:
             ax.set_title(title, color=self.FG_COLOR); ax.axis('off')
         plt.tight_layout()
         canvas = FigureCanvasTkAgg(fig, master=top); canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1); canvas.draw()
+
     def get_current_image(self, gray=False):
         if self.original_image is None: messagebox.showerror("خطأ", "يرجى تحميل صورة أولاً"); return None
         img = self.original_image.copy()
         if gray: return cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         return img
+    
+
+
     def add_button(self, parent, text, command, tooltip_text=None):
         button = ttk.Button(parent, text=text, command=command)
         button.pack(fill=tk.X, padx=10, pady=4)
         tip_text = tooltip_text if tooltip_text else text
         ToolTip(button, tip_text)
+
+
 
 if __name__ == "__main__":
     root = tk.Tk()
